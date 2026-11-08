@@ -156,6 +156,7 @@ body[data-skin="blaireau-alt"] .grain { display: block; }
 /* ---- full player sheet ---- */
 .sheet { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; transform: translateY(100%); transition: transform .45s cubic-bezier(.2,.8,.2,1), background-color .5s ease; padding: calc(10px + env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(22px, env(safe-area-inset-left, 0px)); overflow-y: auto; }
 .sheet.open { transform: none; }
+.grip { width: 40px; height: 5px; border-radius: 3px; background: var(--muted); opacity: .45; margin: 2px auto 0; flex: none; }
 .sheet-in { width: 100%; max-width: 460px; margin: 0 auto; display: grid; gap: 22px; flex: 1; align-content: center; }
 .sheet-top { display: flex; justify-content: space-between; align-items: center; }
 .sheet-top .eyebrow { text-align: center; flex: 1; }
@@ -246,6 +247,7 @@ body[data-skin="blaireau-alt"] .sheet h2 { font-family: var(--poster); font-weig
 </div>
 
 <section class="sheet" id="sheet" aria-hidden="true">
+  <div class="grip" aria-hidden="true"></div>
   <div class="sheet-top">
     <button class="icon-btn" id="sheet-close" type="button" aria-label="Réduire le lecteur"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
     <span class="eyebrow" id="sheet-pl"></span>
@@ -474,6 +476,32 @@ if ("mediaSession" in navigator) {
   $("welcome-done").onclick = () => { store.set("welcome-done", "1"); close(); };
   $("welcome-later").onclick = () => { try { sessionStorage.setItem("welcome-later", "1"); } catch (e) {} close(); };
 })();
+/* ---- swipe down to close the full player ---- */
+(function () {
+  const sh = $("sheet"); let y0 = null, x0 = 0, dy = 0, t0 = 0, drag = false;
+  sh.addEventListener("touchstart", e => {
+    if (!sh.classList.contains("open") || e.touches.length > 1 || e.target.closest("input") || sh.scrollTop > 0) { y0 = null; return; }
+    y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; t0 = Date.now(); drag = false;
+  }, { passive: true });
+  sh.addEventListener("touchmove", e => {
+    if (y0 === null) return;
+    const d = e.touches[0].clientY - y0, dx = e.touches[0].clientX - x0;
+    if (!drag) {
+      if (Math.abs(d) < 8 && Math.abs(dx) < 8) return;
+      if (d <= 0 || Math.abs(dx) > Math.abs(d)) { y0 = null; return; }
+      drag = true; sh.style.transition = "none";
+    }
+    dy = Math.max(0, d); sh.style.transform = `translateY(${dy}px)`; e.preventDefault();
+  }, { passive: false });
+  const end = () => {
+    if (y0 === null) return; y0 = null; if (!drag) return;
+    const fast = dy / Math.max(1, Date.now() - t0) > 0.6;
+    sh.style.transition = ""; sh.style.transform = "";
+    if (dy > 140 || (fast && dy > 40)) closeSheet();
+  };
+  sh.addEventListener("touchend", end); sh.addEventListener("touchcancel", end);
+})();
+
 /* ---- boot ---- */
 renderHome();
 window.addEventListener("hashchange", route);
